@@ -63,7 +63,9 @@ while True:
         break
 
     ticket = msg2[7:39]
-    Kab_Ta_Iv = msg2[39:]
+    g = msg2[39:61]
+    p = msg2[61:69]
+    Kab_Ta_Iv = msg2[69:]
     
 
     #decrypting and getting Kab

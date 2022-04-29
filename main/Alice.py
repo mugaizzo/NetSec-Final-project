@@ -75,7 +75,8 @@ def recv_kdc_msg(kdc_socket):
 
         
         #first DH message:
-        data_to_bob = b'ENC_MSG' + data[2] + Kab_Ta_iv
+        data_to_bob = b'ENC_MSG' + data[2] + b'1342342345234391432678' + b'45456456' + Kab_Ta_iv
+        print(len(data_to_bob))
         #send data to bob
         #recieved on thread 1
         socket1.send(data_to_bob)
