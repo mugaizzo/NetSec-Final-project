@@ -5,10 +5,7 @@ from Crypto.Random import get_random_bytes
 import threading
 import time 
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-import binascii
+from expo import expo
 
 
 
@@ -19,6 +16,7 @@ KAlice = b"this is 24 byte Alice ke"
 N1 = get_random_bytes(8)
 
 def recv_Kb_msg():
+        global kab 
         #prepare message to kdc and serialize it to bytes
         msg3 = pickle.dumps([N1 ,"Alice wants Bob"])
 
@@ -34,20 +32,23 @@ def recv_Kb_msg():
         t2.start()
 
         #the ticket and Kab(N2) are sent inside recv_kdc_msg(kdc_socket)
-        recv_msg2_from_bob = socket1.recv(1024) 
-        print("\nprotocol message 4 Hex:\n", hex(int.from_bytes(recv_msg2_from_bob, 'big')), "\n" )
-        recv_msg2_from_bob = pickle.loads(recv_msg2_from_bob)
+        Kab_Tb_iv = socket1.recv(1024) 
+        # print("\nprotocol message 4 Hex:\n", hex(int.from_bytes(Kab_Tb_iv, 'big')), "\n" )
         print("log: recieved reply from bob")
         print("log: verifing bob challenge")
+        print("Kab_Tb_iv\n\n", Kab_Tb_iv)
+        
+        Tb = get_Tb(kab ,Kab_Tb_iv)
+        Tb = int.from_bytes(Tb, 'big')
+        
+        key= expo(Tb,160031,784313)
+        print("key\n\n", key)
 
         time.sleep(2)
-        N2_1_N3 = get_N2_1_N3(recv_msg2_from_bob, kab)
-        if N2_1_N3[0] == N2-1:
-            print("log: bob is authorized, sending challenge reply.")
-        N3_int = int.from_bytes(N2_1_N3[1], 'big')
-        kab_N3_1 = get_Kab_N2(kab, N3_int-1)
-        kab_N3_1 = pickle.dumps(kab_N3_1)
-        socket1.send(kab_N3_1)
+
+        
+        message_IV = encrypt_main_message(key.to_bytes(24, 'big'), 'hi this is the main message')
+        socket1.send(message_IV)
 
 def recv_kdc_msg(kdc_socket):
     while True:
@@ -60,48 +61,28 @@ def recv_kdc_msg(kdc_socket):
 
         #decrypt data form KDC using KAlice via below function
         data = decrypt_data_from_KDC(msg)
-        print("the tickct is:", data[2], "and the size is:", len(data[3]))
+        print("the tickct is:", data[3], "and the size is:", len(data[3]))
 
         #set Kab and N2 as global variable so that thread 1 can 
         #use it to encrypt data to bob
         global kab 
         kab = data[2]
-        Alice_private_key = ec.generate_private_key(ec.SECT163R2())
-        Alice_public_key =  binascii.b2a_hex(Alice_private_key.public_key().public_numbers().encode_point()).decode()
-        Kab_Ta_iv = encrypt_Ta(data[2], Alice_public_key)
-
-        N1_int = int.from_bytes(N1, 'big')
-        global N2
-        N2 = N1_int - 1
-
-        Kab_N2_iv = get_Kab_N2(data[2], N2)
+        Ta =  expo(1907,160031,784313)
         
-        #below to verify that the communication is to bob
-        if data[1] != "Bob":
-            break
-        data_to_bob = pickle.dumps([data[3], Kab_N2_iv])
+        Kab_Ta_iv = encrypt_Ta(data[2], Ta.to_bytes(8, 'big'))
+        print('Ta is\n\n', Ta)
+        print('Kab_Ta_iv is\n\n', Kab_Ta_iv)
 
+
+        
+        #first DH message:
+        data_to_bob = b'ENC_MSG' + data[3] + Kab_Ta_iv
         #send data to bob
         #recieved on thread 1
         socket1.send(data_to_bob)
-        print("\nprotocol message 3 hex:\n", hex(int.from_bytes(data_to_bob, 'big')), '\n')
         print("log: sending chanllenge to bob")
         break
 
-def get_Kab_N2(Kab, N2):
-    cipher = DES3.new(Kab, DES3.MODE_CBC)
-    data =  pickle.dumps([N2])
-    i=0
-
-    #below while loop for padding
-    while True:
-        i+=1
-        if len(pickle.dumps([N2, 'a' * i ])) % 8 == 0:
-            data = pickle.dumps([N2, 'a'* i ])
-            break
-        
-    Kab_N2 = cipher.encrypt(data)
-    return [Kab_N2, cipher.iv] 
 
 def decrypt_data_from_KDC(msg):
     #msg[1] is the inilization function msg[0] are ecncrypted data
@@ -110,17 +91,19 @@ def decrypt_data_from_KDC(msg):
     data = pickle.loads(data)
     return data      
 
-def get_N2_1_N3(msg, kab):
-    cipher = DES3.new(kab, DES3.MODE_CBC, msg[1])
-    N2_1_N3 = cipher.decrypt(msg[0])
-    N2_1_N3 = pickle.loads(N2_1_N3)
-    N2_1_N3 = pickle.loads(N2_1_N3[0])
-    return N2_1_N3
-
-def encrypt_Ta(Kab, Alice_public_key):
+def encrypt_Ta(Kab, Ta):
     cipher = DES3.new(Kab, DES3.MODE_CBC)
+    Kab_Ta = cipher.encrypt(Ta)
+    return  cipher.IV + Kab_Ta
+
+def get_Tb( Kab,Kab_Tb_Iv):
+    cipher = DES3.new(Kab, DES3.MODE_CBC, Kab_Tb_Iv[0:8])
+    Tb = cipher.decrypt(Kab_Tb_Iv[8:])
+    return Tb
+
+def encrypt_main_message(key, main_message):
+    cipher = DES3.new(key, DES3.MODE_CBC)
     
-    Kab_Ta_Iv = cipher.encrypt(Alice_public_key)
 
 #main logic start here
 #open socket and pring initial messages

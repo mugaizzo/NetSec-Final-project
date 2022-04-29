@@ -8,9 +8,6 @@ import time
 def generate_ticket(Kab):
     cipher = DES3.new(Kbob, DES3.MODE_CBC)
     data = cipher.encrypt(Kab)
-    print("ICICIC", cipher.iv)
-    print("datadate date", data)
-    print("concaatooo", cipher.iv + data)
     ticket_iv = cipher.iv+data
     return ticket_iv
     

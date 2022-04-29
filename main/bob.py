@@ -1,54 +1,35 @@
 
 from copyreg import pickle
+import imp
 import socket
 from tkinter import N
 from Crypto.Cipher import DES3
 from Crypto.Random import get_random_bytes
 import pickle
 import time
+from expo import expo
+
 
 #bob key
 Kbob = b" this is 24 byte bob key"
 
-def generateKbob_Nb():
-    cipher = DES3.new(Kbob, DES3.MODE_CBC)
-    Nbob = get_random_bytes(8)
-    Kbob_Nb_Iv = [cipher.iv, cipher.encrypt(Nbob)]
-    return Kbob_Nb_Iv
+
+def get_Ta( Kab,Kab_Ta_Iv):
+    cipher = DES3.new(Kab, DES3.MODE_CBC, Kab_Ta_Iv[0:8])
+    Ta = cipher.decrypt(Kab_Ta_Iv[8:])
+    return Ta
+
     
 def get_Kab(ticket_iv):
-    cipher = DES3.new(Kbob, DES3.MODE_CBC, ticket_iv[1])
-    ticket = cipher.decrypt(ticket_iv[0])
-    ticket = pickle.loads(ticket)
-    return ticket[0]
+    cipher = DES3.new(Kbob, DES3.MODE_CBC, ticket_iv[0:8])
+    ticket = cipher.decrypt(ticket_iv[8:])
+    return ticket
 
-def get_N2(Kab, Kab_N2_iv):
-    cipher = DES3.new(Kab, DES3.MODE_CBC, Kab_N2_iv[1])
-    ticket = cipher.decrypt(Kab_N2_iv[0])
-    ticket = pickle.loads(ticket)
-    return ticket[0]
 
-def get_Kab_N2_1_N3_iv(Kab, N2, N3):
+def encrypt_Tb(Kab, Tb):
     cipher = DES3.new(Kab, DES3.MODE_CBC)
-    N2_1_N3 = pickle.dumps([N2-1, N3])
-    i=0
-    while True:
-        i+=1
-        if len(pickle.dumps([N2_1_N3, 'a'* i ])) % 8 == 0:
-            N2_1_N3 = pickle.dumps([N2_1_N3, 'a'* i ])
-            break
-
-
-    Kab_N2_1_N3 = cipher.encrypt(N2_1_N3)
-    Kab_N2_1_N3_iv = pickle.dumps([Kab_N2_1_N3, cipher.iv])
-    return Kab_N2_1_N3_iv
-
-def get_N3_1(msg3, Kab):
-    cipher = DES3.new(Kab, DES3.MODE_CBC, msg3[1])
-    ticket = cipher.decrypt(msg3[0])
-    ticket = pickle.loads(ticket)
-    return ticket[0]
-
+    Kab_Tb = cipher.encrypt(Tb)
+    return  cipher.IV + Kab_Tb
 
 # main logic starts here
 # Open socket and log initial messages
@@ -70,18 +51,35 @@ while True:
     msg2 = connection1.recv(1024)
     print("log: recieved message from Alice")
     time.sleep(1)
-    msg2 = pickle.loads(msg2)
+
+    if msg2[0:7] != b'ENC_MSG':
+        print("log: normal message!\n")
+        print("log: content is\n\n")
+        print(msg)
+        break
+
+    ticket = msg2[7:39]
+    Kab_Ta_Iv = msg2[39:]
+    print("Kab_Ta_Iv \n\n", Kab_Ta_Iv)
+
     #decrypting and getting Kab
-    Kab = get_Kab(msg2[0])
-    #using kab to get N2
-    N2 = get_N2(Kab, msg2[1])
-    #generating N2
-    N3 = get_random_bytes(8)
-    N3_int = int.from_bytes(N3, 'big')
-    Kab_N2_1_N3_iv = get_Kab_N2_1_N3_iv(Kab, N2, N3)
+    Kab = get_Kab(ticket)
+    #using kab to get Ta
+    Ta = get_Ta(Kab ,Kab_Ta_Iv)
+    Ta = int.from_bytes(Ta, 'big')
+    
+
+    Tb = expo(1907,12077,784313)
+    Kab_Tb_iv = encrypt_Tb(Kab, Tb.to_bytes(8, 'big'))
+    key= expo(Ta,12077,784313)
+    print("key\n\n", key)
+    
+
     #sending reply to Alice
-    connection1.send(Kab_N2_1_N3_iv)
+    connection1.send(Kab_Tb_iv)
     print("log: sending challenge to Alice")
+    print("Kab_Tb_iv\n\n", Kab_Tb_iv)
+
     time.sleep(1)
     msg3 = connection1.recv(1024)
     print("log: recieved reply from Alice")

@@ -12,7 +12,7 @@ Bob_private_key = ec.generate_private_key(ec.SECT163R2())
 Bob_public_key = binascii.b2a_hex(Bob_private_key.public_key().public_numbers().encode_point()).decode()
 
 print(Bob_public_key)
-# print(len(Bob_public_key))
+print(len(Bob_public_key))
 
 Alice_private_key = ec.generate_private_key(ec.SECT163R2())
 # Alice_public_key =  binascii.b2a_hex(Alice_private_key.public_key().public_numbers().encode_point()).decode()
