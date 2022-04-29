@@ -44,7 +44,6 @@ def Bob_2FA():
     twoFactrandom = socket_bob_2fa.recv(1024) 
     socket_bob_2fa.send(twoFactrandom)
     ticket = socket_bob_2fa.recv(1024)
-    
 
 
     
