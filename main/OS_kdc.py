@@ -32,18 +32,16 @@ while True:
     time.sleep(1)
     print("log: recieved something...")
     #if message contain Alice wants Bob reply back with needed ticket
-    if msg[1] == "Alice wants Bob":
+    if msg[0] == "Alice wants Bob":
         print("Alice wants Bob")
         #generating ticket
         time.sleep(1)
         Kab = get_random_bytes(24)
         ticket_iv = generate_ticket(Kab)
-        print("heheh", len(ticket_iv))
-        N1 = msg[0]
+
         #encrypting message
         cipher = DES3.new(KAlice, DES3.MODE_CBC)
-        data = pickle.dumps([N1, "Bob", Kab, ticket_iv, "pading"])
-        print("datadatelen", len(data))
+        data = pickle.dumps(["Bob", Kab, ticket_iv, "pading   "])
         reply = cipher.encrypt(data)
         #reply to Alice
         connection1.send(pickle.dumps([reply, cipher.iv]))

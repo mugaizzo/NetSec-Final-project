@@ -13,12 +13,12 @@ from expo import expo
 kab = ''
 N2 = 0 
 KAlice = b"this is 24 byte Alice ke"
-N1 = get_random_bytes(8)
+
 
 def recv_Kb_msg():
         global kab 
         #prepare message to kdc and serialize it to bytes
-        msg3 = pickle.dumps([N1 ,"Alice wants Bob"])
+        msg3 = pickle.dumps(["Alice wants Bob"])
 
         #open socket to KDC and send message
         kdc_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -32,23 +32,24 @@ def recv_Kb_msg():
         t2.start()
 
         #the ticket and Kab(N2) are sent inside recv_kdc_msg(kdc_socket)
-        Kab_Tb_iv = socket1.recv(1024) 
+        Kab_mainIV_Tb_iv = socket1.recv(1024) 
         # print("\nprotocol message 4 Hex:\n", hex(int.from_bytes(Kab_Tb_iv, 'big')), "\n" )
         print("log: recieved reply from bob")
         print("log: verifing bob challenge")
-        print("Kab_Tb_iv\n\n", Kab_Tb_iv)
+
         
-        Tb = get_Tb(kab ,Kab_Tb_iv)
+        mainIv_Tb = get_mainIV_Tb(kab , Kab_mainIV_Tb_iv)
+        mainIv = mainIv_Tb[:8]
+        Tb = mainIv_Tb[8:]
         Tb = int.from_bytes(Tb, 'big')
         
-        key= expo(Tb,160031,784313)
-        print("key\n\n", key)
+        key= expo(Tb,160031134132423423,1342342345234391432678)
 
         time.sleep(2)
 
-        
-        message_IV = encrypt_main_message(key.to_bytes(24, 'big'), 'hi this is the main message')
-        socket1.send(message_IV)
+        main_message_enc = encrypt_main_message(key.to_bytes(24, 'big'), b'hi this is the main message', mainIv)
+        print("Sending main message encrypted")
+        socket1.send(main_message_enc) 
 
 def recv_kdc_msg(kdc_socket):
     while True:
@@ -61,22 +62,20 @@ def recv_kdc_msg(kdc_socket):
 
         #decrypt data form KDC using KAlice via below function
         data = decrypt_data_from_KDC(msg)
-        print("the tickct is:", data[3], "and the size is:", len(data[3]))
 
         #set Kab and N2 as global variable so that thread 1 can 
         #use it to encrypt data to bob
         global kab 
-        kab = data[2]
-        Ta =  expo(1907,160031,784313)
+        kab = data[1]
+        Ta =  expo(45456456,160031134132423423,1342342345234391432678)
         
-        Kab_Ta_iv = encrypt_Ta(data[2], Ta.to_bytes(8, 'big'))
-        print('Ta is\n\n', Ta)
-        print('Kab_Ta_iv is\n\n', Kab_Ta_iv)
+        Kab_Ta_iv = encrypt_Ta(data[1], Ta.to_bytes(16, 'big'))
+ 
 
 
         
         #first DH message:
-        data_to_bob = b'ENC_MSG' + data[3] + Kab_Ta_iv
+        data_to_bob = b'ENC_MSG' + data[2] + Kab_Ta_iv
         #send data to bob
         #recieved on thread 1
         socket1.send(data_to_bob)
@@ -96,13 +95,24 @@ def encrypt_Ta(Kab, Ta):
     Kab_Ta = cipher.encrypt(Ta)
     return  cipher.IV + Kab_Ta
 
-def get_Tb( Kab,Kab_Tb_Iv):
+def get_mainIV_Tb( Kab,Kab_Tb_Iv):
     cipher = DES3.new(Kab, DES3.MODE_CBC, Kab_Tb_Iv[0:8])
-    Tb = cipher.decrypt(Kab_Tb_Iv[8:])
-    return Tb
+    mainIv_Tb = cipher.decrypt(Kab_Tb_Iv[8:])
+    return mainIv_Tb
 
-def encrypt_main_message(key, main_message):
-    cipher = DES3.new(key, DES3.MODE_CBC)
+def encrypt_main_message(key, main_message, mainIv):
+    cipher = DES3.new(key, DES3.MODE_CBC, mainIv)
+    
+    #below while loop for padding
+    while True:
+        if len(main_message) % 8 == 0: 
+            break
+        else:
+            main_message = main_message + b' ' 
+    
+
+    main_message_enc = cipher.encrypt(main_message)
+    return main_message_enc
     
 
 #main logic start here

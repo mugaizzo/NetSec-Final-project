@@ -1,13 +1,12 @@
 
-from copyreg import pickle
-import imp
+
 import socket
-from tkinter import N
 from Crypto.Cipher import DES3
 from Crypto.Random import get_random_bytes
-import pickle
+
 import time
-from expo import expo
+from expo import expo           
+
 
 
 #bob key
@@ -25,11 +24,16 @@ def get_Kab(ticket_iv):
     ticket = cipher.decrypt(ticket_iv[8:])
     return ticket
 
+def get_main_message(key, main_message_enc, main_msg_iv):
+    cipher = DES3.new(key, DES3.MODE_CBC, main_msg_iv)
+    main_message = cipher.decrypt(main_message_enc)
+    return main_message
 
-def encrypt_Tb(Kab, Tb):
+
+def encrypt_Tb(Kab, mainIV_Tb):
     cipher = DES3.new(Kab, DES3.MODE_CBC)
-    Kab_Tb = cipher.encrypt(Tb)
-    return  cipher.IV + Kab_Tb
+    Kab_mainIV_Tb = cipher.encrypt(mainIV_Tb)
+    return  cipher.IV + Kab_mainIV_Tb
 
 # main logic starts here
 # Open socket and log initial messages
@@ -60,7 +64,7 @@ while True:
 
     ticket = msg2[7:39]
     Kab_Ta_Iv = msg2[39:]
-    print("Kab_Ta_Iv \n\n", Kab_Ta_Iv)
+    
 
     #decrypting and getting Kab
     Kab = get_Kab(ticket)
@@ -69,26 +73,25 @@ while True:
     Ta = int.from_bytes(Ta, 'big')
     
 
-    Tb = expo(1907,12077,784313)
-    Kab_Tb_iv = encrypt_Tb(Kab, Tb.to_bytes(8, 'big'))
-    key= expo(Ta,12077,784313)
-    print("key\n\n", key)
+    Tb = expo(45456456,120212177,1342342345234391432678)
+    main_msg_iv = get_random_bytes(8)
+    Kab_mainIV_Tb_iv = encrypt_Tb(Kab, main_msg_iv+Tb.to_bytes(16, 'big'))
+    key= expo(Ta,120212177,1342342345234391432678)
+    
     
 
     #sending reply to Alice
-    connection1.send(Kab_Tb_iv)
+    connection1.send(Kab_mainIV_Tb_iv)
     print("log: sending challenge to Alice")
-    print("Kab_Tb_iv\n\n", Kab_Tb_iv)
+    
 
     time.sleep(1)
-    msg3 = connection1.recv(1024)
-    print("log: recieved reply from Alice")
+    main_message_enc = connection1.recv(1024)
+    print("log: recieved main message from Alice")
     time.sleep(3)
-    print("\nprotocol message 5:\n", hex(int.from_bytes(msg3, 'big')), "\n")
-    msg3 = pickle.loads(msg3)
-    N3_1 =  get_N3_1(msg3, Kab)
-    if N3_1 == N3_int - 1:
-        print("log: Alice is authenticated")
+    
+    main_message =  get_main_message(key.to_bytes(24, 'big'), main_message_enc,main_msg_iv)
+    print("recived message:\n", str(main_message, 'utf-8') )
 
     break
 
