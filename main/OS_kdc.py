@@ -31,7 +31,7 @@ def alice_verification():
     socket_alice_2fa.send(alice_random)
     random_from_alice = socket_alice_2fa.recv(1024)
     if random_from_alice == alice_random:
-        print("Alice verified!")
+        print("log: Alice verified!")
         exit()
 
 def bob_verification():
