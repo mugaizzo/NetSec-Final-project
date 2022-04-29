@@ -3,7 +3,7 @@
 import socket
 from Crypto.Cipher import DES3
 from Crypto.Random import get_random_bytes
-
+import threading
 import time
 from expo import expo           
 
@@ -35,6 +35,19 @@ def encrypt_Tb(Kab, mainIV_Tb):
     Kab_mainIV_Tb = cipher.encrypt(mainIV_Tb)
     return  cipher.IV + Kab_mainIV_Tb
 
+
+def Bob_2FA():
+    global ticket
+    socket_bob_2fa = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    socket_bob_2fa.connect(("127.0.0.1", 44477))
+    socket_bob_2fa.send(b'recived this from bob'+ticket)
+    twoFactrandom = socket_bob_2fa.recv(1024) 
+    socket_bob_2fa.send(twoFactrandom)
+    ticket = socket_bob_2fa.recv(1024)
+    
+
+
+    
 # main logic starts here
 # Open socket and log initial messages
 socket1 = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -61,8 +74,14 @@ while True:
         print("log: content is\n\n")
         print(msg)
         break
-
+    print("log: encrypted message! fetching KDC address and verifing")
+    global ticket
     ticket = msg2[7:39]
+
+    thread_2fa = threading.Thread(target=Bob_2FA) 
+    thread_2fa.start()
+    thread_2fa.join()
+    
     g = msg2[39:61]
     p = msg2[61:69]
     Kab_Ta_Iv = msg2[69:]

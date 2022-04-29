@@ -1,3 +1,4 @@
+from email import message
 import pickle
 import socket
 from Crypto.Cipher import DES3
@@ -14,6 +15,14 @@ kab = ''
 N2 = 0 
 KAlice = b"this is 24 byte Alice ke"
 
+def Alice_2FA():
+    socket2fa = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    socket2fa.bind(('localhost', 55566))
+    socket2fa.listen(10)
+    connection2fa, addr = socket2fa.accept()
+    twoFactrandom = connection2fa.recv(1024)
+    connection2fa.send(twoFactrandom)
+    
 
 def recv_Kb_msg():
         global kab 
@@ -25,6 +34,9 @@ def recv_Kb_msg():
         kdc_socket.connect(("127.0.0.1", 5555))
         kdc_socket.send(msg3)
         print("log: sending to KDC\n")
+        thread_2fa = threading.Thread(target=Alice_2FA) 
+        thread_2fa.start()
+        thread_2fa.join()
         time.sleep(1)
         #open new thread to recieve message form KDC 
         #continue on fuction recv_Kb_msg()
@@ -71,12 +83,9 @@ def recv_kdc_msg(kdc_socket):
         
         Kab_Ta_iv = encrypt_Ta(data[1], Ta.to_bytes(16, 'big'))
  
-
-
-        
         #first DH message:
         data_to_bob = b'ENC_MSG' + data[2] + b'1342342345234391432678' + b'45456456' + Kab_Ta_iv
-        print(len(data_to_bob))
+
         #send data to bob
         #recieved on thread 1
         socket1.send(data_to_bob)
@@ -122,7 +131,8 @@ socket1 = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 print("\n\n\nHI I'M ALICE") 
 #connect to bob and send "I want to talk to you"
 socket1.connect(("127.0.0.1", 11223))
-  
+
+
 #open new thread to recieve message from bob
 #continue on fuction recv_Kb_msg()
 t = threading.Thread(target=recv_Kb_msg)
